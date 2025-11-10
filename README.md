@@ -26,8 +26,20 @@ setx KITE_ENABLE_REAL "false"
 
 3. Run the app:
 
+Development mode (Flask debug server):
 ```pwsh
 python app.py
+```
+
+Production mode (Gunicorn):
+```pwsh
+# Default: HOST=0.0.0.0 PORT=5000 WORKERS=2
+gunicorn wsgi:app --bind 0.0.0.0:5000 --workers 2
+
+# Custom settings:
+$env:PORT = 8000
+$env:WORKERS = 4
+gunicorn wsgi:app --bind 0.0.0.0:$env:PORT --workers $env:WORKERS
 ```
 
 API Endpoints
