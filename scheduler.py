@@ -1,6 +1,9 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from models import db, ScheduledOrder, KiteUser
+from models import ScheduledOrderLog
+import json
 from kite_client import KiteClientWrapper
 import logging
 
@@ -13,6 +16,18 @@ def place_order(session, order: ScheduledOrder):
         order.status = "failed"
         session.add(order)
         session.commit()
+        # log failure
+        try:
+            log = ScheduledOrderLog(
+                scheduled_order_id=order.id,
+                user_id=order.user_id,
+                status='failed',
+                message='Kite user not found during execution',
+            )
+            session.add(log)
+            session.commit()
+        except Exception:
+            logger.exception('Failed to write order log for missing user')
         return {"status": "error", "error": "kite user not found"}
 
     kc = KiteClientWrapper(user.api_key, user.api_secret, user.access_token)
@@ -25,6 +40,24 @@ def place_order(session, order: ScheduledOrder):
         order.status = "failed"
     session.add(order)
     session.commit()
+
+    # create execution log
+    try:
+        msg = None
+        try:
+            msg = json.dumps(res)
+        except Exception:
+            msg = str(res)
+        log = ScheduledOrderLog(
+            scheduled_order_id=order.id,
+            user_id=order.user_id,
+            status=order.status,
+            message=msg,
+        )
+        session.add(log)
+        session.commit()
+    except Exception:
+        logger.exception('Failed to write order execution log for order %s', order.id)
     return res
 
 
@@ -32,10 +65,12 @@ def place_pending_orders(app, session_maker):
     """Find pending orders scheduled <= now and try to place them."""
     with app.app_context():
         session = session_maker()
-        now = datetime.utcnow()
+        # Get current time in IST (same timezone as stored scheduled_time)
+        ist = ZoneInfo('Asia/Kolkata')
+        now_ist = datetime.now(ist).replace(tzinfo=None)
         pending = session.query(ScheduledOrder).filter(
             ScheduledOrder.status == "pending",
-            ScheduledOrder.scheduled_time <= now,
+            ScheduledOrder.scheduled_time <= now_ist,
         ).all()
         for order in pending:
             logger.info("Placing scheduled order id=%s for %s", order.id, order.stock_symbol)
@@ -47,6 +82,11 @@ def place_pending_orders(app, session_maker):
 
 def start_scheduler(app, session_maker):
     scheduler = BackgroundScheduler()
-    scheduler.add_job(lambda: place_pending_orders(app, session_maker), 'interval', minutes=1, id='place_pending_orders')
+    scheduler.add_job(
+        lambda: place_pending_orders(app, session_maker),
+        'interval',
+        minutes=1,
+        id='place_pending_orders'
+    )
     scheduler.start()
     return scheduler

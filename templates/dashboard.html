@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <h2>Dashboard</h2>
+      <a href="{{ url_for('admin_create') }}" class="btn btn-success" title="Manage admins">
+        <i class="fas fa-user-plus"></i> Create Admin
+      </a>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <h4>Users</h4>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>User ID</th>
+            <th>Status</th>
+            <th>Token Expiry</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+            <tr>
+              <td>
+                <a href="{{ url_for('user_profile', user_id=u.id) }}" class="text-decoration-none">
+                  {% if u.avatar_url %}
+                    <img src="{{ u.avatar_url }}" alt="" class="rounded-circle me-2" style="width: 24px; height: 24px;">
+                  {% endif %}
+                  {{ u.user_name or 'Not configured' }}
+                </a>
+              </td>
+              <td>{{ u.user_id or 'Not logged in' }}</td>
+              <td>
+                {% if u.access_token %}
+                  {% if u.token_expiry and u.token_expiry > now %}
+                    <span class="badge bg-success">Active</span>
+                  {% else %}
+                    <span class="badge bg-warning">Expired</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-danger">No Token</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.token_expiry_ist %}
+                  {{ u.token_expiry_ist }}
+                {% elif u.token_expiry %}
+                  {{ u.token_expiry }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('user_profile', user_id=u.id) }}" class="btn btn-sm btn-info">
+                  <i class="fas fa-user"></i> Profile
+                </a>
+                {% if not u.access_token or not u.token_expiry or u.token_expiry <= now %}
+                <a href="{{ url_for('kite_login', user_id=u.id) }}" class="btn btn-sm btn-success ms-1">
+                  <i class="fas fa-sign-in-alt"></i> Login with Kite
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h5>Create User</h5>
+      <form action="{{ url_for('dashboard_create_user') }}" method="post">
+        <div class="mb-2">
+          <input class="form-control" name="api_key" placeholder="API Key" required />
+        </div>
+        <div class="mb-2">
+          <input class="form-control" type="password" name="api_secret" placeholder="API Secret" required />
+        </div>
+        <button class="btn btn-success">Create User</button>
+      </form>
+      <small class="text-muted mt-2 d-block">
+        After creating a user, you'll need to login with Kite to complete the setup.
+      </small>
+    </div>
+
+    <div class="col-md-6">
+      <h4>Schedule Order (applies to all users)</h4>
+      <form action="{{ url_for('dashboard_create_order') }}" method="post" id="scheduleForm">
+        <div class="mb-2">
+          <label class="form-label">Stock Symbol</label>
+          <select name="stock_symbol" class="form-select" required>
+            <option value="">Select symbol</option>
+            {% for s in allowed_stocks %}
+              <option value="{{ s.symbol }}">{{ s.symbol }} — {{ s.percentage }} — {{ s.leverage }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <input class="form-control" name="quantity" placeholder="Quantity" required />
+        </div>
+        <div class="mb-2">
+          <select name="order_type" class="form-select" required>
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Schedule Time (today only) — between 09:30 and 15:30</label>
+          <div class="row g-2">
+            <div class="col-auto">
+              <label class="form-label" style="font-size: 0.875rem;">Time</label>
+              <input 
+                class="form-control" 
+                name="scheduled_time_hm" 
+                type="time" 
+                id="scheduled_time_hm"
+                min="09:30"
+                max="15:30"
+                required
+              />
+            </div>
+            <div class="col-auto">
+              <label class="form-label" style="font-size: 0.875rem;">Seconds</label>
+              <input 
+                class="form-control" 
+                name="scheduled_time_ss" 
+                type="number" 
+                id="scheduled_time_ss"
+                min="0"
+                max="59"
+                value="0"
+                style="width: 80px;"
+              />
+            </div>
+          </div>
+          <div class="text-danger small mt-1" id="timeError"></div>
+        </div>
+        <button class="btn btn-primary" type="submit" id="scheduleButton">Schedule for all users</button>
+      </form>
+
+      <script>
+        function getISTNow() {
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+          });
+          const parts = formatter.formatToParts(new Date());
+          const dateObj = {};
+          parts.forEach(part => {
+            dateObj[part.type] = part.value;
+          });
+          return new Date(
+            parseInt(dateObj.year),
+            parseInt(dateObj.month) - 1,
+            parseInt(dateObj.day),
+            parseInt(dateObj.hour),
+            parseInt(dateObj.minute),
+            parseInt(dateObj.second)
+          );
+        }
+
+        function validateScheduleTime() {
+          const inputHM = document.getElementById('scheduled_time_hm');
+          const inputSS = document.getElementById('scheduled_time_ss');
+          const errorDiv = document.getElementById('timeError');
+          const button = document.getElementById('scheduleButton');
+          const timeVal = inputHM.value; // HH:MM
+          
+          if (!timeVal) {
+            errorDiv.textContent = 'Please select a time.';
+            inputHM.classList.add('is-invalid');
+            button.disabled = true;
+            return;
+          }
+
+          // Get current IST time
+          const now_ist = getISTNow();
+          const [hh, mm] = timeVal.split(':').map(Number);
+          let ss = parseInt(inputSS.value) || 0;
+          if (ss < 0) ss = 0;
+          if (ss > 59) ss = 59;
+          
+          const selected_ist = new Date(
+            now_ist.getFullYear(),
+            now_ist.getMonth(),
+            now_ist.getDate(),
+            hh, mm, ss
+          );
+
+          let errorMsg = '';
+
+          // Check if selected time is in the past (today IST)
+          if (selected_ist <= now_ist) {
+            errorMsg = 'Cannot schedule orders in the past. Select a future time today.';
+          }
+
+          // Trading hours check (09:30 - 15:30)
+          const timeFloat = hh + mm/60 + ss/3600;
+          if (timeFloat < 9.5 || timeFloat > 15.5) {
+            errorMsg = 'Please select a time between 09:30 and 15:30.';
+          }
+
+          if (errorMsg) {
+            inputHM.classList.add('is-invalid');
+            inputHM.classList.remove('is-valid');
+            errorDiv.textContent = errorMsg;
+            button.disabled = true;
+          } else {
+            inputHM.classList.remove('is-invalid');
+            inputHM.classList.add('is-valid');
+            errorDiv.textContent = '';
+            button.disabled = false;
+          }
+        }
+
+        document.getElementById('scheduled_time_hm').addEventListener('change', validateScheduleTime);
+        document.getElementById('scheduled_time_ss').addEventListener('change', validateScheduleTime);
+        document.getElementById('scheduleForm').addEventListener('submit', function(e) {
+          validateScheduleTime();
+          if (document.getElementById('timeError').textContent) {
+            e.preventDefault();
+          } else {
+            // Combine time and seconds into HH:MM:SS format
+            const hm = document.getElementById('scheduled_time_hm').value;
+            const ss = (document.getElementById('scheduled_time_ss').value || '0').padStart(2, '0');
+            const combined = hm + ':' + ss;
+            
+            // Create hidden input with combined time
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'scheduled_time';
+            hiddenInput.value = combined;
+            this.appendChild(hiddenInput);
+          }
+        });
+      </script>
+
+      <h5 class="mt-4">Orders</h5>
+      <table class="table table-sm">
+        <thead><tr><th>ID</th><th>User</th><th>Symbol</th><th>Qty</th><th>Type</th><th>Time</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for o in orders %}
+            <tr>
+              <td>{{ o.id }}</td>
+              <td>{{ o.user_id }}</td>
+              <td>{{ o.stock_symbol }}</td>
+              <td>{{ o.quantity }}</td>
+              <td>{{ o.order_type }}</td>
+              <td>{{ o.scheduled_time }}</td>
+              <td>{{ o.status }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      
+      <h5 class="mt-4">Recent Scheduling Logs</h5>
+      <table class="table table-sm">
+        <thead><tr><th>Time (IST)</th><th>Order ID</th><th>User ID</th><th>Status</th><th>Message</th></tr></thead>
+        <tbody>
+          {% for log in logs %}
+            <tr>
+              <td>{{ log.created_at_ist or log.created_at }}</td>
+              <td>{{ log.scheduled_order_id }}</td>
+              <td>{{ log.user_id }}</td>
+              <td>{{ log.status }}</td>
+              <td style="max-width:400px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ log.message }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

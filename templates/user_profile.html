@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+  <div class="row mb-4">
+    <div class="col">
+      <h2>User Profile</h2>
+      {% if user.avatar_url %}
+        <img src="{{ user.avatar_url }}" alt="Profile" class="rounded-circle mb-2" style="width: 64px; height: 64px;">
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Basic Information</h5>
+        </div>
+        <div class="card-body">
+          <form action="{{ url_for('update_user', user_id=user.id) }}" method="post">
+            <div class="mb-3">
+              <label class="form-label">Kite User ID</label>
+              <input type="text" class="form-control" value="{{ user.user_id }}" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Name</label>
+              <input type="text" class="form-control" value="{{ user.user_name }}" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" value="{{ user.email }}" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Broker</label>
+              <input type="text" class="form-control" value="{{ user.broker }}" readonly>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">API Key</label>
+              <input type="text" class="form-control" name="api_key" value="{{ user.api_key }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">API Secret</label>
+              <input type="password" class="form-control" name="api_secret" placeholder="Enter new API secret if changing">
+            </div>
+            <button type="submit" class="btn btn-primary">Update API Keys</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Access & Permissions</h5>
+        </div>
+        <div class="card-body">
+              <div class="mb-3">
+                  <label class="form-label">Access Token Status</label>
+                  <div class="d-flex align-items-center">
+                    {% if user.access_token %}
+                      {% if user.token_expiry and user.token_expiry > now %}
+                        <span class="badge bg-success">Valid until {{ user.token_expiry_ist or user.token_expiry.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                      {% else %}
+                        <span class="badge bg-warning">Expired - Please login again</span>
+                        <a href="{{ url_for('kite_login', user_id=user.id) }}" class="btn btn-sm btn-primary ms-2">
+                          <i class="fas fa-sign-in-alt me-1"></i> Login with Kite
+                        </a>
+                      {% endif %}
+                    {% else %}
+                      <span class="badge bg-danger">No Token - Please login</span>
+                      <a href="{{ url_for('kite_login', user_id=user.id) }}" class="btn btn-sm btn-primary ms-2">
+                        <i class="fas fa-sign-in-alt me-1"></i> Login with Kite
+                      </a>
+                    {% endif %}
+                  </div>
+                </div>
+            <label class="form-label">Available Exchanges</label>
+            <div>
+              {% for exchange in user.exchanges.split(',') if user.exchanges %}
+                <span class="badge bg-info">{{ exchange }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Available Products</label>
+            <div>
+              {% for product in user.products.split(',') if user.products %}
+                <span class="badge bg-secondary">{{ product }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Order Types</label>
+            <div>
+              {% for type in user.order_types.split(',') if user.order_types %}
+                <span class="badge bg-primary">{{ type }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-4">
+    <div class="col">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

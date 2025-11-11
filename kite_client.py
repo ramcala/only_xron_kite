@@ -41,12 +41,13 @@ class KiteClientWrapper:
         if KITE_ENABLE_REAL and self.kite:
             try:
                 order = self.kite.place_order(
+                    variety="regular",
                     tradingsymbol=tradingsymbol,
                     exchange="NSE",
                     transaction_type=tx,
                     quantity=quantity,
                     order_type="MARKET",
-                    product="MIS",
+                    product="CNC",
                 )
                 return {"status": "success", "order_id": str(order), "raw": order}
             except Exception as e:
