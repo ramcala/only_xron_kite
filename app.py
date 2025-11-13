@@ -222,6 +222,10 @@ def create_app():
     def list_orders():
         orders = ScheduledOrder.query.order_by(ScheduledOrder.scheduled_time.asc()).all()
         return jsonify([o.to_dict() for o in orders])
+    
+    @app.route('/')
+    def index():
+        return redirect(url_for('dashboard'))
 
 
     # Dashboard views
