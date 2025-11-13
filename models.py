@@ -9,7 +9,7 @@ class KiteUser(db.Model):
     __tablename__ = "kite_users"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String(128), unique=True, nullable=True)
-    api_key = db.Column(db.String(256), nullable=False)
+    api_key = db.Column(db.String(256), unique=True, nullable=False)
     api_secret = db.Column(db.String(256), nullable=False)
     access_token = db.Column(db.String(1024), nullable=True)
     token_expiry = db.Column(db.DateTime, nullable=True)

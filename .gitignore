@@ -1,0 +1,7 @@
+*.pyc
+Dockerfile
+__pycache__/
+.vscode/
+.idea/
+.venv/
+db.sqlite3
