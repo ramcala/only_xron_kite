@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import Index
 
 db = SQLAlchemy()
 
@@ -55,6 +56,10 @@ class ScheduledOrder(db.Model):
     kite_order_id = db.Column(db.String(128), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('ix_scheduledorder_scheduled_time_status', 'scheduled_time', 'status'),
+    )
 
     def to_dict(self):
         return {
