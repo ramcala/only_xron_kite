@@ -7,6 +7,7 @@ from scheduler import start_scheduler, place_order
 from kiteconnect import KiteConnect
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
 from functools import wraps
 import os
 
@@ -179,8 +180,15 @@ def create_app():
         if not api_key or not api_secret:
             return jsonify({"error": "api_key and api_secret required"}), 400
         user = KiteUser(api_key=api_key, api_secret=api_secret)
-        db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.add(user)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"error": "api_key already exists"}), 400
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
         return jsonify(user.to_dict()), 201
 
 
@@ -295,8 +303,15 @@ def create_app():
             user.access_token = None
             user.token_expiry = None
         
-        db.session.commit()
-        flash('User information updated successfully', 'success')
+        try:
+            db.session.commit()
+            flash('User information updated successfully', 'success')
+        except IntegrityError:
+            db.session.rollback()
+            flash('A user with this API key already exists (first 4 chars: ' + (api_key[:4] if api_key else '') + ').', 'error')
+        except Exception as e:
+            db.session.rollback()
+            flash('Error updating user: ' + str(e), 'error')
         return redirect(url_for('user_profile', user_id=user_id))
 
     @app.route('/logs')
@@ -374,9 +389,16 @@ def create_app():
             flash('api_key and api_secret are required', 'error')
             return redirect(url_for('dashboard'))
         user = KiteUser(api_key=api_key, api_secret=api_secret)
-        db.session.add(user)
-        db.session.commit()
-        flash('User created. Please login with Kite to complete setup.', 'success')
+        try:
+            db.session.add(user)
+            db.session.commit()
+            flash('User created. Please login with Kite to complete setup.', 'success')
+        except IntegrityError:
+            db.session.rollback()
+            flash('A user with this API key already exists (first 4 chars: ' + (api_key[:4] if api_key else '') + ').', 'error')
+        except Exception as e:
+            db.session.rollback()
+            flash('Error creating user: ' + str(e), 'error')
         return redirect(url_for('dashboard'))
 
 

@@ -18,6 +18,7 @@
           <tr>
             <th>Name</th>
             <th>User ID</th>
+            <th>API Key</th>
             <th>Status</th>
             <th>Token Expiry</th>
             <th>Actions</th>
@@ -35,6 +36,7 @@
                 </a>
               </td>
               <td>{{ u.user_id or 'Not logged in' }}</td>
+              <td><small class="text-muted">{{ u.api_key_preview }}</small></td>
               <td>
                 {% if u.access_token %}
                   {% if u.token_expiry and u.token_expiry > now %}
@@ -83,6 +85,16 @@
       <small class="text-muted mt-2 d-block">
         After creating a user, you'll need to login with Kite to complete the setup.
       </small>
+
+      <!-- Show previews of existing API keys to help avoid duplicates -->
+      <div class="mt-2">
+        <small class="text-muted">Existing API key previews:</small>
+        <div class="mt-1">
+          {% for u in users %}
+            <span class="badge bg-light text-dark me-1">{{ u.api_key_preview }}</span>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
     <div class="col-md-6">
@@ -259,15 +271,33 @@
       
       <h5 class="mt-4">Recent Scheduling Logs</h5>
       <table class="table table-sm">
-        <thead><tr><th>Time (IST)</th><th>Order ID</th><th>User ID</th><th>Status</th><th>Message</th></tr></thead>
+        <thead><tr><th>Time (IST)</th><th>Order ID</th><th>User ID</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           {% for log in logs %}
             <tr>
               <td>{{ log.created_at_ist or log.created_at }}</td>
               <td>{{ log.scheduled_order_id }}</td>
               <td>{{ log.user_id }}</td>
-              <td>{{ log.status }}</td>
-              <td style="max-width:400px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ log.message }}</td>
+              <td><span class="badge bg-info">{{ log.status }}</span></td>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#log-{{ log.id }}" aria-expanded="false">
+                  <i class="fas fa-chevron-down"></i> Details
+                </button>
+              </td>
+            </tr>
+            <tr class="collapse" id="log-{{ log.id }}">
+              <td colspan="5">
+                <div class="p-3 bg-light">
+                  <strong>Message:</strong>
+                  <div class="mt-2 p-2 bg-white border rounded" style="font-family: monospace; font-size: 0.85rem; max-height: 200px; overflow-y: auto;">
+                    {% if log.message %}
+                      {{ log.message }}
+                    {% else %}
+                      <em class="text-muted">No message</em>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
             </tr>
           {% endfor %}
         </tbody>

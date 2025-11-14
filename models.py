@@ -25,18 +25,29 @@ class KiteUser(db.Model):
     avatar_url = db.Column(db.String(1024), nullable=True)
     token_set_at = db.Column(db.DateTime, nullable=True)
 
+    @property
+    def api_key_preview(self) -> str:
+        """Return a short preview (first 4 characters) of the api_key for UI hints.
+        This avoids exposing the full key while helping users avoid duplicate entries.
+        """
+        if not self.api_key:
+            return ''
+        # show first 4 chars and mask the rest
+        return f"{self.api_key[:4]}..."
+
     def to_dict(self):
+        # avoid returning the full api_key in API responses
         return {
             "id": self.id,
             "user_id": self.user_id,
-            "api_key": self.api_key,
+            "api_key_preview": self.api_key_preview,
             "api_secret": "*****",
             "access_token": bool(self.access_token),
             "email": self.email,
             "user_name": self.user_name,
             "user_shortname": self.user_shortname,
             "broker": self.broker,
-            "created_at": self.created_at.isoformat(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
             "exchanges": self.exchanges.split(",") if self.exchanges else [],
             "products": self.products.split(",") if self.products else [],
             "order_types": self.order_types.split(",") if self.order_types else [],
